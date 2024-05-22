@@ -1,0 +1,94 @@
+import org.w3c.dom.Document;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.validation.Schema;
+import javax.xml.validation.SchemaFactory;
+import javax.xml.validation.Validator;
+import javax.xml.XMLConstants;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpression;
+import javax.xml.xpath.XPathExpressionException;
+import javax.xml.xpath.XPathFactory;
+import java.io.File;
+import java.io.IOException;
+import javax.xml.parsers.ParserConfigurationException;
+
+public class XMLProcessor {
+
+    public static void main(String[] args) {
+        // Define paths and XPath expressions
+        String xsdPath = "path/to/your/schema.xsd";
+        String xmlFilesPath = "path/to/your/xml/files";
+        String[] xpaths = {
+                "/root/element1",
+                "/root/element2/subelement"
+                // Add more XPaths as needed
+        };
+
+        // Load the XSD schema
+        Schema schema = loadSchema(xsdPath);
+
+        // Process each XML file
+        File folder = new File(xmlFilesPath);
+        File[] listOfFiles = folder.listFiles((dir, name) -> name.toLowerCase().endsWith(".xml"));
+        if (listOfFiles != null) {
+            for (File xmlFile : listOfFiles) {
+                try {
+                    // Validate the XML file
+                    if (validateXML(schema, xmlFile)) {
+                        // Extract values if valid
+                        extractValues(xmlFile, xpaths);
+                    } else {
+                        System.out.println("Skipping extraction for " + xmlFile.getName() + " due to validation errors.");
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    private static Schema loadSchema(String xsdPath) {
+        Schema schema = null;
+        try {
+            SchemaFactory factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
+            schema = factory.newSchema(new File(xsdPath));
+        } catch (SAXException e) {
+            e.printStackTrace();
+        }
+        return schema;
+    }
+
+    private static boolean validateXML(Schema schema, File xmlFile) {
+        try {
+            Validator validator = schema.newValidator();
+            validator.validate(new DOMSource(DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(xmlFile)));
+            return true;
+        } catch (SAXException | IOException | ParserConfigurationException e) {
+            System.out.println("Validation error in " + xmlFile.getName() + ": " + e.getMessage());
+            return false;
+        }
+    }
+
+    private static void extractValues(File xmlFile, String[] xpaths) throws ParserConfigurationException, IOException, SAXException, XPathExpressionException {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        Document document = builder.parse(xmlFile);
+        XPathFactory xPathfactory = XPathFactory.newInstance();
+        XPath xpath = xPathfactory.newXPath();
+
+        System.out.println("Extracted values from " + xmlFile.getName() + ":");
+        for (String xpathExpression : xpaths) {
+            XPathExpression expr = xpath.compile(xpathExpression);
+            NodeList nodes = (NodeList) expr.evaluate(document, XPathConstants.NODESET);
+            for (int i = 0; i < nodes.getLength(); i++) {
+                System.out.println(xpathExpression + ": " + nodes.item(i).getTextContent());
+            }
+        }
+    }
+}
